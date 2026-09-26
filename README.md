@@ -28,8 +28,16 @@
 
 ```bash
 cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-./run.sh
+./run.sh   # 自动建/修 .venv、装依赖、跑启动自检，全部通过后才会起服务
+```
+
+`run.sh` 启动前会执行 `python -m app.selfcheck` 做启动自检：依赖是否装齐、
+示例数据是否完整、样品流转的环节/名册/编号配置是否闭合。缺什么会逐条列出并给出
+修复说明，自检不过不会把服务停在半启动状态。也可以随时单独执行：
+
+```bash
+make selfcheck                      # 或 cd backend && .venv/bin/python -m app.selfcheck
+curl http://127.0.0.1:8000/api/selfcheck   # 服务运行中查看自检结果
 ```
 
 健康检查：`curl http://127.0.0.1:8000/api/health`
@@ -72,5 +80,8 @@ npm run dev
 
 - 每个模块的前端页面在 `frontend/src/views/<模块>/index.vue`，后端接口在
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
+- 样品流转的共用规则只有一份，收在 `backend/app/services/transfer.py`：
+  流转环节可选集合、交接人名册、流转编号生成（`STOC-XXXX`，留空自动续号），
+  以及发起交接、确认接收、取消交接、退回样品的状态判定。改规则只改这里。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。

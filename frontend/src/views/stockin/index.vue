@@ -71,7 +71,7 @@ type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/stockin'
 const columns = ["流转编号", "关联样品", "流转环节", "交接人", "接收人", "交接时间", "存放位置", "流转状态"]
-const actions = ["发起交接", "确认接收", "退回样品"]
+const actions = ["发起交接", "确认接收", "取消交接", "退回样品"]
 const statuses = ["待交接", "流转中", "已接收", "已退回"]
 const stats = [{"label": "待交接记录", "value": 0}, {"label": "流转中样品", "value": 0}, {"label": "退回次数", "value": 0}]
 
@@ -99,10 +99,14 @@ async function runAction(action: string, row: Row) {
   try {
     const response = await request(`${ENDPOINT}/${row.id}/actions`, {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ values: { action } }),
     })
     if (!response.ok) {
       throw new Error('样品流转动作未生效，请稍后重试')
+    }
+    const payload = await response.json()
+    if (!payload.ok) {
+      throw new Error(payload.message || '样品流转动作未生效，请稍后重试')
     }
     await reload()
   } catch (error) {
