@@ -25,6 +25,7 @@
       </label>
       <button class="btn" type="submit">查询</button>
       <button class="btn ghost" type="button" @click="resetFilters">重置条件</button>
+      <span class="filter-hint">流转环节可选：{{ flowSteps.join('、') }}</span>
     </form>
 
     <table class="data-table">
@@ -71,7 +72,11 @@ type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/stockin'
 const columns = ["流转编号", "关联样品", "流转环节", "交接人", "接收人", "交接时间", "存放位置", "流转状态"]
-const actions = ["发起交接", "确认接收", "退回样品"]
+// 动作与流转环节默认走后端 /options 下发的共用集合；接口不可用时退回本地兜底值
+const DEFAULT_ACTIONS = ["发起交接", "确认接收", "取消交接", "退回样品"]
+const DEFAULT_STEPS = ["采样接收", "入库暂存", "分发检测", "留样归档"]
+const actions = ref<string[]>([...DEFAULT_ACTIONS])
+const flowSteps = ref<string[]>([...DEFAULT_STEPS])
 const statuses = ["待交接", "流转中", "已接收", "已退回"]
 const stats = [{"label": "待交接记录", "value": 0}, {"label": "流转中样品", "value": 0}, {"label": "退回次数", "value": 0}]
 
@@ -99,10 +104,14 @@ async function runAction(action: string, row: Row) {
   try {
     const response = await request(`${ENDPOINT}/${row.id}/actions`, {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ values: { action } }),
     })
     if (!response.ok) {
       throw new Error('样品流转动作未生效，请稍后重试')
+    }
+    const payload = await response.json()
+    if (!payload.ok) {
+      throw new Error(payload.message || '样品流转动作未生效')
     }
     await reload()
   } catch (error) {
@@ -126,5 +135,24 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+async function loadOptions() {
+  try {
+    const response = await request(`${ENDPOINT}/options`)
+    if (!response.ok) return
+    const payload = await response.json()
+    if (Array.isArray(payload.actions) && payload.actions.length) {
+      actions.value = payload.actions
+    }
+    if (Array.isArray(payload.flowSteps) && payload.flowSteps.length) {
+      flowSteps.value = payload.flowSteps
+    }
+  } catch {
+    // 选项拉取失败不阻塞列表，沿用本地兜底值
+  }
+}
+
+onMounted(() => {
+  void loadOptions()
+  void reload()
+})
 </script>
